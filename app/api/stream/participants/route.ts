@@ -24,7 +24,9 @@ export async function GET(req: NextRequest){
             });
         }
     
-        const streamData = getAllParticipantsInAStream.parse(await req.json());
+        const streamData = getAllParticipantsInAStream.parse(
+            Object.fromEntries(req.nextUrl.searchParams)
+        );
     
         const data = await prisma.stream.findMany({
             where: {
@@ -53,8 +55,4 @@ export async function GET(req: NextRequest){
             { status: 400 }
         );
     }
-}
-
-export async function PATCH() {
-    
 }

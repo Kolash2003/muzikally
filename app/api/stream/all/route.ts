@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
+
+// Get all streams created by user in desc order
 export async function GET() {
     try {
         const session = await auth.api.getSession({

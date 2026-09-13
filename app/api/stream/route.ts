@@ -12,6 +12,16 @@ const getStreamSchema = z.object({
     streamId: z.string(),
 })
 
+const endStreamSchema = z.object({
+    streamId: z.string()
+})
+
+const deleteStreamSchema = z.object({
+    streamId: z.string()
+})
+
+
+// streamer creates a stream
 export async function POST(req: NextRequest) {
     try {
         const session = await auth.api.getSession({
@@ -56,6 +66,7 @@ export async function POST(req: NextRequest) {
     }
 }
 
+// get stream by streamId
 export async function GET(req: NextRequest) {
     try {
         const session = await auth.api.getSession({
@@ -101,3 +112,88 @@ export async function GET(req: NextRequest) {
         );
     }
 }
+
+
+export async function PATCH(req: NextRequest) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if(!session?.user) {
+        return NextResponse.json({
+            success: false,
+            message: "Unauthorized",
+            error: null
+        }, {
+            status: 401
+        })
+    }
+
+    const data = endStreamSchema.parse(await req.json());
+
+    const endStream = await prisma.stream.update({
+        where: {
+            id: data.streamId,
+            userId: session.user.id
+        },
+        data: {
+            active: false,
+        }
+    })
+
+    return NextResponse.json({
+        success: true,
+        message: `Stream with id ${endStream.id} ended succesfully`,
+        error: null
+    }, {
+        status: 200
+    })
+}
+
+
+// streamer deletes a stream
+export async function DELETE(req: NextRequest) {
+    try {
+        const session = await auth.api.getSession({
+            headers: await headers(),
+        });
+
+        if (!session?.user) {
+            return NextResponse.json({
+                success: false,
+                message: "Unauthorized",
+                error: null
+            }, {
+                status: 401
+            })
+        }
+
+        const data = deleteStreamSchema.parse(await req.json());
+
+        const deletedStream = await prisma.stream.delete({
+            where: {
+                id: data.streamId,
+                userId: session.user.id
+            }
+        })
+
+        return NextResponse.json({
+            success: true,
+            message: `Stream with id ${deletedStream.id} deleted successfully`,
+            error: null
+        }, {
+            status: 200
+        })
+    } catch (error) {
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Error while deleting stream",
+                error: error instanceof Error ? error.message : String(error),
+            },
+            { status: 400 }
+        );
+    }
+}
+
+
