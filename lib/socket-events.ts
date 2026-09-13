@@ -10,9 +10,11 @@ export const SocketEvents = {
   StreamLeave: "stream:leave",
   UpvoteToggle: "upvote:toggle",
   PlaybackControl: "playback:control",
+  QueueRemove: "queue:remove",
   /** server → room */
   QueueUpdated: "queue:updated",
   PlaybackState: "playback:state",
+  StreamEnded: "stream:ended",
   /** server → socket */
   Error: "error",
 } as const;
@@ -32,6 +34,11 @@ export interface UpvoteTogglePayload {
   musicId: string;
 }
 
+export interface QueueRemovePayload {
+  streamId: string;
+  musicId: string;
+}
+
 export type PlaybackAction = "play" | "pause" | "next";
 
 export interface PlaybackControlPayload {
@@ -44,10 +51,55 @@ export interface PlaybackControlPayload {
 export interface QueueEntry {
   musicId: string;
   votes: number;
+  title: string;
+  artist: string | null;
+  url: string;
+  thumbnailUrl: string | null;
+  durationSeconds: number | null;
+  source: "Youtube" | "Spotify";
+  addedByName: string;
+  current: boolean;
 }
 
 export interface QueueUpdatedPayload {
   streamId: string;
+  queue: QueueEntry[];
+}
+
+export interface StreamEndedPayload {
+  streamId: string;
+}
+
+export interface ParticipantInfo {
+  id: string;
+  name: string;
+  image: string | null;
+  isOwner: boolean;
+}
+
+/** Full room hydration returned by the stream:join ack. */
+export interface StreamJoinAckData {
+  you: { id: string; isOwner: boolean };
+  stream: {
+    id: string;
+    code: string;
+    type: "Youtube" | "Spotify";
+    active: boolean;
+    ownerName: string;
+  };
+  participants: ParticipantInfo[];
+  queue: QueueEntry[];
+  playback: PlaybackStatePayload;
+  /** musicIds the joining user has already upvoted. */
+  myUpvotes: string[];
+}
+
+export interface UpvoteToggleAckData {
+  queue: QueueEntry[];
+  upvoted: boolean;
+}
+
+export interface QueueRemoveAckData {
   queue: QueueEntry[];
 }
 

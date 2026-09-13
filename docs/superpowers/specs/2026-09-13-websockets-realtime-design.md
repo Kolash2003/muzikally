@@ -46,6 +46,7 @@ ack callback and may also produce an `error` ack payload.
 | C → S | `stream:join` / `stream:leave` | `{streamId}` | session user must be stream owner or a participant |
 | C → S | `upvote:toggle` | `{streamId, musicId}` | session user must be a participant of that stream |
 | C → S | `playback:control` | `{streamId, action}` where `action ∈ {play, pause, next}` | **owner only**: `stream.userId === session.user.id` |
+| C → S | `queue:remove` | `{streamId, musicId}` | **owner only**: deletes the song (upvotes cascade); if it was playing, broadcasts paused playback |
 | S → room `stream:{id}` | `queue:updated` | sorted queue snapshot `[{musicId, votes}]` | — |
 | S → room `stream:{id}` | `playback:state` | `{status: playing|paused, musicId?, positionSeconds}` | — |
 | S → socket | `error` | `{event, message}` | — |

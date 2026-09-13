@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { broadcastStreamEnded } from "@/lib/socket";
 import { headers } from "next/headers";
 
 const CreateStreamSchema = z.object({
@@ -140,6 +141,9 @@ export async function PATCH(req: NextRequest) {
             active: false,
         }
     })
+
+    // Notify the room and clear cached stream state.
+    await broadcastStreamEnded(data.streamId);
 
     return NextResponse.json({
         success: true,

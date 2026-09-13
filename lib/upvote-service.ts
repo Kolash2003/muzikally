@@ -12,26 +12,75 @@ export const metaKey = (streamId: string) => `stream:${streamId}:meta`;
  * Ordered queue snapshot for a stream, cache-aside: reads the Redis sorted
  * set; on a miss (or empty set) hydrates from Postgres and warms the cache.
  * Falls back to a direct Postgres read when Redis is unavailable.
+ *
+ * The Redis set stores only `musicId → votes`; entries are enriched with
+ * music metadata (title, thumbnail, adder, …) from Postgres on every read.
  */
 export async function getQueue(streamId: string): Promise<QueueEntry[]> {
   const key = queueKey(streamId);
+  let pairs: { musicId: string; votes: number }[] = [];
   try {
     const raw = await redis.zrange<(string | number)[]>(key, 0, -1, {
       withScores: true,
       rev: true,
     });
     if (raw.length > 0) {
-      return parseZRangePairs(raw);
+      pairs = parseZRangePairs(raw);
     }
   } catch (error) {
     console.error(`[upvote] redis zrange failed for ${key}:`, error);
   }
-  return hydrateQueueFromDb(streamId);
+  if (pairs.length === 0) {
+    pairs = await hydrateQueueFromDb(streamId);
+  }
+  return enrichQueueEntries(pairs);
+}
+
+/** Attach music metadata to ordered `(musicId, votes)` pairs, preserving order. */
+async function enrichQueueEntries(
+  pairs: { musicId: string; votes: number }[],
+): Promise<QueueEntry[]> {
+  if (pairs.length === 0) return [];
+  const musics = await prisma.music.findMany({
+    where: { id: { in: pairs.map((p) => p.musicId) } },
+    select: {
+      id: true,
+      title: true,
+      artist: true,
+      url: true,
+      thumbnailUrl: true,
+      durationSeconds: true,
+      source: true,
+      current: true,
+      user: { select: { name: true } },
+    },
+  });
+  const byId = new Map(musics.map((m) => [m.id, m]));
+  const entries: QueueEntry[] = [];
+  for (const pair of pairs) {
+    const music = byId.get(pair.musicId);
+    if (!music) continue; // row deleted since the score was written
+    entries.push({
+      musicId: music.id,
+      votes: pair.votes,
+      title: music.title,
+      artist: music.artist,
+      url: music.url,
+      thumbnailUrl: music.thumbnailUrl,
+      durationSeconds: music.durationSeconds,
+      source: music.source,
+      addedByName: music.user.name,
+      current: music.current,
+    });
+  }
+  return entries;
 }
 
 /** Sort descending by votes. Raw format alternates [member, score, ...]. */
-function parseZRangePairs(raw: (string | number)[]): QueueEntry[] {
-  const entries: QueueEntry[] = [];
+function parseZRangePairs(
+  raw: (string | number)[],
+): { musicId: string; votes: number }[] {
+  const entries: { musicId: string; votes: number }[] = [];
   for (let i = 0; i < raw.length - 1; i += 2) {
     entries.push({
       musicId: String(raw[i]),
@@ -41,7 +90,9 @@ function parseZRangePairs(raw: (string | number)[]): QueueEntry[] {
   return entries;
 }
 
-async function hydrateQueueFromDb(streamId: string): Promise<QueueEntry[]> {
+async function hydrateQueueFromDb(
+  streamId: string,
+): Promise<{ musicId: string; votes: number }[]> {
   const [grouped, musics] = await Promise.all([
     prisma.upvote.groupBy({
       by: ["musicId"],
@@ -54,7 +105,7 @@ async function hydrateQueueFromDb(streamId: string): Promise<QueueEntry[]> {
     }),
   ]);
   const counts = new Map(grouped.map((g) => [g.musicId, Number(g._count)]));
-  const entries: QueueEntry[] = musics.map((m) => ({
+  const entries = musics.map((m) => ({
     musicId: m.id,
     votes: counts.get(m.id) ?? 0,
   }));
@@ -78,13 +129,14 @@ async function hydrateQueueFromDb(streamId: string): Promise<QueueEntry[]> {
 /**
  * Write-through upvote toggle.
  * Postgres is the source of truth and is written first; the Redis sorted
- * set mirrors the delta atomically. Returns the fresh ordered queue.
+ * set mirrors the delta atomically. Returns the fresh ordered queue plus
+ * the caller's resulting vote state.
  */
 export async function toggleUpvote(
   streamId: string,
   musicId: string,
   userId: string,
-): Promise<QueueEntry[]> {
+): Promise<{ queue: QueueEntry[]; upvoted: boolean }> {
   // Authorization: caller must be an owner or a participant of the stream.
   const [participant, stream, music] = await Promise.all([
     prisma.participation.findUnique({
@@ -125,5 +177,5 @@ export async function toggleUpvote(
     console.error(`[upvote] redis mirror failed for ${musicId}:`, error);
   }
 
-  return getQueue(streamId);
+  return { queue: await getQueue(streamId), upvoted: delta > 0 };
 }

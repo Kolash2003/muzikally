@@ -3,12 +3,15 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import z from "zod";
 import { headers } from "next/headers";
+import { broadcastQueue } from "@/lib/socket";
 
 const addMusicToStream = z.object({
     streamId: z.string(),
     title: z.string().min(1),
     artist: z.string().optional(),
-    url: z.string()
+    url: z.string(),
+    thumbnailUrl: z.string().optional(),
+    durationSeconds: z.number().int().positive().optional(),
 })
 
 function getSourceFromUrl(url: string): "Youtube" | "Spotify" | null {
@@ -95,6 +98,16 @@ export async function POST(req: NextRequest) {
             })
         }
 
+        if (source !== stream.type) {
+            return NextResponse.json({
+                success: false,
+                message: `This is a ${stream.type} session — only ${stream.type} links are allowed`,
+                error: null
+            }, {
+                status: 400
+            })
+        }
+
         const music = await prisma.music.create({
             data: {
                 streamId: data.streamId,
@@ -103,8 +116,13 @@ export async function POST(req: NextRequest) {
                 artist: data.artist,
                 url: data.url,
                 source: source,
+                thumbnailUrl: data.thumbnailUrl,
+                durationSeconds: data.durationSeconds,
             }
         })
+
+        // Invalidate the cached queue and broadcast the fresh order to room.
+        await broadcastQueue(data.streamId);
 
         return NextResponse.json({
             success: true,
