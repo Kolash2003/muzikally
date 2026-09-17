@@ -38,6 +38,7 @@ import {
 interface RoomHeaderProps {
   streamId: string;
   code: string;
+  active: boolean;
   isOwner: boolean;
   ownerName: string;
   participants: ParticipantInfo[];
@@ -46,6 +47,7 @@ interface RoomHeaderProps {
 export function RoomHeader({
   streamId,
   code,
+  active,
   isOwner,
   ownerName,
   participants,
@@ -54,6 +56,7 @@ export function RoomHeader({
   const [copied, setCopied] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [endDialogOpen, setEndDialogOpen] = useState(false);
 
   async function copyCode() {
     try {
@@ -91,7 +94,8 @@ export function RoomHeader({
       const json = await res.json();
       if (!json?.success) throw new Error(json?.message || "Failed");
       // The stream:ended broadcast flips everyone (including the owner)
-      // to the ended screen.
+      // to the ended screen; dismiss the confirmation dialog.
+      setEndDialogOpen(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not end session");
       setEnding(false);
@@ -202,8 +206,11 @@ export function RoomHeader({
           </PopoverContent>
         </Popover>
 
-        {isOwner ? (
-          <AlertDialog>
+        {isOwner && active ? (
+          <AlertDialog
+            open={endDialogOpen}
+            onOpenChange={setEndDialogOpen}
+          >
             <AlertDialogTrigger
               render={
                 <Button

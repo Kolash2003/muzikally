@@ -67,6 +67,7 @@ export function RoomClient({ streamId }: { streamId: string }) {
         <RoomHeader
           streamId={streamId}
           code={room.stream.code}
+          active={room.stream.active}
           isOwner={room.you.isOwner}
           ownerName={room.stream.ownerName}
           participants={room.participants}
@@ -83,6 +84,7 @@ export function RoomClient({ streamId }: { streamId: string }) {
       <RoomHeader
         streamId={streamId}
         code={room.stream.code}
+        active={room.stream.active}
         isOwner={room.you.isOwner}
         ownerName={room.stream.ownerName}
         participants={room.participants}

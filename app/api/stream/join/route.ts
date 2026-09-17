@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     
         const isTheCodeValid = await prisma.stream.findUnique({
             where: {
-                code: data.code,
+                code: data.code.trim(),
             }
         })
     

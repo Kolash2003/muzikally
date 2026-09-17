@@ -73,7 +73,7 @@ export function JoinSessionCard() {
             <div className="flex gap-2">
               <Input
                 value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                onChange={(e) => setCode(e.target.value)}
                 placeholder="e.g. 49A2B"
                 maxLength={16}
                 autoComplete="off"

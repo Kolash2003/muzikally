@@ -206,7 +206,7 @@ export function NotAMemberScreen({
       <form onSubmit={join} className="flex w-full gap-2 pt-2">
         <Input
           value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          onChange={(e) => setCode(e.target.value)}
           placeholder="e.g. 49A2B"
           maxLength={16}
           autoComplete="off"
