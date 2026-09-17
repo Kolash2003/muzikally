@@ -2,6 +2,8 @@
 
 **Real-time social jukebox.** Open a room, share one code, and let everyone's votes decide what plays next. No aux cord needed.
 
+<img width="1494" height="764" alt="image" src="https://github.com/user-attachments/assets/ae67f2ea-3187-49d4-ae13-fdd2d0150763" />
+
 muzi is a collaborative jam-session app: a host spins up a room (YouTube or Spotify), friends join with a five-character code from any browser, and upvotes reorder the shared queue live. Only the host controls playback — everyone else shapes what plays next.
 
 ## Features
