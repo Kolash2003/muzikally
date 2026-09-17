@@ -114,8 +114,17 @@ export function AddSong({ streamId, streamType, onAdded }: AddSongProps) {
   }
 
   return (
-    <Card>
+    <Card className="glass-card overflow-hidden border-white/10 shadow-xl">
       <CardContent className="flex flex-col gap-3 p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Queue a Track
+          </span>
+          <span className="rounded-md border border-border/40 bg-muted/30 px-2 py-0.5 text-[10px] font-semibold text-primary">
+            {streamType}
+          </span>
+        </div>
+
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Link2 className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -125,36 +134,39 @@ export function AddSong({ streamId, streamType, onAdded }: AddSongProps) {
               placeholder={`Paste a ${streamType} link…`}
               autoComplete="off"
               spellCheck={false}
-              className="pl-9"
+              className="h-10 rounded-xl bg-muted/20 pl-9 text-xs border-border/80 focus-visible:border-primary focus-visible:ring-primary/20"
             />
           </div>
           <Button
             onClick={add}
             disabled={state.status !== "resolved" || adding}
+            className="h-10 rounded-xl px-4 text-xs font-semibold shadow-md shadow-primary/20 transition-all active:scale-95"
           >
             {adding ? (
-              <Loader2 className="size-4 animate-spin" />
+              <Loader2 className="size-3.5 animate-spin" />
             ) : (
-              <Plus className="size-4" />
+              <Plus className="size-3.5" />
             )}
-            Add
+            <span>Add</span>
           </Button>
         </div>
 
         {state.status === "resolving" ? (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Looking up that link…
-          </p>
+          <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 p-2.5 text-xs text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin text-primary" />
+            <span>Fetching track details from {streamType}…</span>
+          </div>
         ) : null}
 
         {state.status === "error" ? (
-          <p className="text-sm text-destructive">{state.message}</p>
+          <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {state.message}
+          </p>
         ) : null}
 
         {state.status === "resolved" ? (
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-2.5">
-            <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+          <div className="flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 p-2.5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-muted border border-border/60">
               {state.track.thumbnailUrl ? (
                 <Image
                   src={state.track.thumbnailUrl}
@@ -168,15 +180,18 @@ export function AddSong({ streamId, streamType, onAdded }: AddSongProps) {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
+              <p className="truncate text-xs font-bold text-foreground">
                 {state.track.title}
               </p>
               {state.track.artist ? (
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="truncate text-[11px] text-muted-foreground">
                   {state.track.artist}
                 </p>
               ) : null}
             </div>
+            <span className="rounded-md bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary uppercase">
+              Ready
+            </span>
           </div>
         ) : null}
       </CardContent>
