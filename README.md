@@ -13,13 +13,35 @@ muzi is a collaborative jam-session app: a host spins up a room (YouTube or Spot
 - **Host controls** — playback is owner-only; voting is open to every room member
 - **Google sign-in** — via better-auth
 
-## Stack
+## 🛠️ Tech Stack
 
-- **Next.js 16** (App Router, RSC) + **React 19** + **TypeScript**
-- **Custom Node server** (`server.ts`) serving Next.js HTTP and socket.io on one process
-- **PostgreSQL** + **Prisma** (source of truth) · **Redis (Upstash)** (queue cache-aside + sorted-set ranking)
-- **better-auth** (Google OAuth + email/password)
-- **Tailwind CSS v4** + **shadcn/ui** (base-nova preset, Outfit font)
+<p align="left">
+  <a href="https://nextjs.org/"><img src="https://skillicons.dev/icons?i=nextjs,react,ts,nodejs,postgres,prisma,redis,tailwind,docker,git&theme=dark" alt="Tech stack icons" /></a>
+</p>
+
+<p align="left">
+  <img src="https://img.shields.io/badge/Next.js_16-black?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js 16" />
+  <img src="https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socket.io&logoColor=white" alt="Socket.io" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white" alt="Prisma" />
+  <img src="https://img.shields.io/badge/Upstash_Redis-D82C20?style=for-the-badge&logo=redis&logoColor=white" alt="Upstash Redis" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS v4" />
+  <img src="https://img.shields.io/badge/shadcn/ui-000000?style=for-the-badge&logo=shadcnui&logoColor=white" alt="shadcn/ui" />
+  <img src="https://img.shields.io/badge/better--auth-FF6B6B?style=for-the-badge&logo=auth0&logoColor=white" alt="better-auth" />
+</p>
+
+| Category | Technologies |
+| --- | --- |
+| ⚛️ **Frontend** | ![Next.js](https://img.shields.io/badge/-Next.js_16_App_Router-black?logo=next.js) ![React](https://img.shields.io/badge/-React_19-20232A?logo=react&logoColor=61DAFB) ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white) ![RSC](https://img.shields.io/badge/-React_Server_Components-149ECA) |
+| ⚙️ **Backend** | ![Node.js](https://img.shields.io/badge/-Node.js-339933?logo=node.js&logoColor=white) ![Custom Server](https://img.shields.io/badge/-Custom_Server_(server.ts)-000000) ![Zod](https://img.shields.io/badge/-Zod-3E67B1) |
+| 🔌 **Realtime** | ![socket.io](https://img.shields.io/badge/-socket.io_4.x-010101?logo=socket.io&logoColor=white) ![WebSockets](https://img.shields.io/badge/-WebSockets-4A4A4A) |
+| 🗄️ **Database & Cache** | ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-4169E1?logo=postgresql&logoColor=white) ![Prisma](https://img.shields.io/badge/-Prisma_7-2D3748?logo=prisma&logoColor=white) ![Redis](https://img.shields.io/badge/-Upstash_Redis-D82C20?logo=redis&logoColor=white) |
+| 🔐 **Auth** | ![better-auth](https://img.shields.io/badge/-better--auth-FF6B6B) ![Google OAuth](https://img.shields.io/badge/-Google_OAuth-4285F4?logo=google&logoColor=white) |
+| 🎨 **UI / Styling** | ![Tailwind](https://img.shields.io/badge/-Tailwind_CSS_v4-06B6D4?logo=tailwindcss&logoColor=white) ![shadcn](https://img.shields.io/badge/-shadcn/ui-000000) ![Outfit](https://img.shields.io/badge/-Outfit_Font-8B5CF6) ![Lucide](https://img.shields.io/badge/-Lucide_Icons-F56565) ![Sonner](https://img.shields.io/badge/-Sonner-FBBF24) |
+| 🧰 **Tooling & DX** | ![ESLint](https://img.shields.io/badge/-ESLint-4B32C3?logo=eslint&logoColor=white) ![tsx](https://img.shields.io/badge/-tsx-FFCB05) ![Prisma Seed](https://img.shields.io/badge/-Seed_MUZI--JAM-2D3748) |
+| 🚀 **Deploy** | ![Railway](https://img.shields.io/badge/-Railway-0B0D0E?logo=railway&logoColor=white) ![Render](https://img.shields.io/badge/-Render-46E3B7?logo=render&logoColor=black) ![Fly.io](https://img.shields.io/badge/-Fly.io-7C3AED?logo=flydotio&logoColor=white) ⚠️ _Not Vercel — needs long-lived Node for sockets_ |
 
 ## Architecture notes
 
