@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { emitWithAck, getSocket } from "@/lib/socket-client";
 import {
   SocketEvents,
+  type ParticipantsUpdatedPayload,
   type PlaybackAction,
   type PlaybackStatePayload,
   type QueueEntry,
@@ -41,11 +42,15 @@ export function useRoomSocket({ streamId }: UseRoomSocketOptions) {
   const [pendingVotes, setPendingVotes] = useState<Set<string>>(new Set());
   const [pendingRemoves, setPendingRemoves] = useState<Set<string>>(new Set());
   const [lastError, setLastError] = useState<string | null>(null);
+  const myIdRef = useRef<string | null>(null);
+  const participantIdsRef = useRef<Set<string>>(new Set());
 
   // The subscription effect below lists streamId as a dependency, so its
   // handlers always close over the current room id.
 
   const applyJoinData = useCallback((data: StreamJoinAckData) => {
+    myIdRef.current = data.you.id;
+    participantIdsRef.current = new Set(data.participants.map((p) => p.id));
     setRoom(data);
     setQueue(data.queue);
     setPlayback(data.playback);
@@ -102,6 +107,22 @@ export function useRoomSocket({ streamId }: UseRoomSocketOptions) {
         );
       }
     };
+    const onParticipants = (body: ParticipantsUpdatedPayload) => {
+      if (cancelled || body.streamId !== streamId) return;
+      const prevIds = participantIdsRef.current;
+      const me = myIdRef.current;
+      if (me) {
+        for (const p of body.participants) {
+          if (!prevIds.has(p.id) && p.id !== me) {
+            toast.info(`${p.name} joined the jam`);
+          }
+        }
+      }
+      participantIdsRef.current = new Set(body.participants.map((p) => p.id));
+      setRoom((prev) =>
+        prev ? { ...prev, participants: body.participants } : prev,
+      );
+    };
     const onEnded = (body: { streamId: string }) => {
       if (cancelled || body.streamId !== streamId) return;
       setPhase("ended");
@@ -121,6 +142,7 @@ export function useRoomSocket({ streamId }: UseRoomSocketOptions) {
 
     socket.on(SocketEvents.QueueUpdated, onQueue);
     socket.on(SocketEvents.PlaybackState, onPlayback);
+    socket.on(SocketEvents.ParticipantsUpdated, onParticipants);
     socket.on(SocketEvents.StreamEnded, onEnded);
     socket.on(SocketEvents.Error, onError);
     socket.on("connect", onReconnect);
@@ -134,6 +156,7 @@ export function useRoomSocket({ streamId }: UseRoomSocketOptions) {
       cancelled = true;
       socket.off(SocketEvents.QueueUpdated, onQueue);
       socket.off(SocketEvents.PlaybackState, onPlayback);
+      socket.off(SocketEvents.ParticipantsUpdated, onParticipants);
       socket.off(SocketEvents.StreamEnded, onEnded);
       socket.off(SocketEvents.Error, onError);
       socket.off("connect", onReconnect);

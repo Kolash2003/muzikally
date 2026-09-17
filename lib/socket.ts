@@ -11,6 +11,7 @@ import {
   roomName,
   type Ack,
   type ParticipantInfo,
+  type ParticipantsUpdatedPayload,
   type PlaybackStatePayload,
   type PlaybackStatus,
   type QueueUpdatedPayload,
@@ -20,9 +21,9 @@ import {
 } from "./socket-events";
 import {
   STREAM_TTL,
+  getAllSongs,
   getQueue,
   metaKey,
-  queueKey,
   stateKey,
   toggleUpvote,
 } from "./upvote-service";
@@ -31,6 +32,7 @@ interface SessionUser {
   id: string;
   name: string;
   email: string;
+  image: string | null;
 }
 
 type StreamMeta = { userId: string; active: boolean };
@@ -120,7 +122,7 @@ async function buildJoinData(
       where: { userId, music: { streamId } },
       select: { musicId: true },
     }),
-    getQueue(streamId),
+    stream.active ? getQueue(streamId) : getAllSongs(streamId),
     getPlaybackState(streamId),
   ]);
 
@@ -245,14 +247,6 @@ async function advanceToNext(streamId: string): Promise<string | undefined> {
       data: { current: true },
     }),
   ]);
-  // Played songs drop out of the queue cache.
-  try {
-    if (current?.id) {
-      await redis.zrem(queueKey(streamId), current.id);
-    }
-  } catch (error) {
-    console.error(`[socket] redis zrem failed for ${streamId}:`, error);
-  }
   return nextId;
 }
 
@@ -271,7 +265,7 @@ function getIoInstance(): SocketIOServer | undefined {
 }
 
 /**
- * Invalidate the queue cache and push the fresh ordered queue to the room.
+ * Push the fresh ordered queue to the room.
  * Used by REST routes (e.g. POST /api/music after a song is added).
  */
 export async function broadcastQueue(streamId: string) {
@@ -280,13 +274,49 @@ export async function broadcastQueue(streamId: string) {
     console.error(`[socket] broadcastQueue skipped: no io instance`);
     return;
   }
-  try {
-    await redis.del(queueKey(streamId)); // force re-hydration on next read
-  } catch (error) {
-    console.error(`[socket] queue cache invalidate failed for ${streamId}:`, error);
-  }
   const body = { streamId, queue: await getQueue(streamId) };
   io.to(roomName(streamId)).emit(SocketEvents.QueueUpdated, body);
+}
+
+/** Who is currently connected to this room (socket presence, not membership). */
+async function listConnectedParticipants(
+  streamId: string,
+): Promise<ParticipantInfo[]> {
+  const io = getIoInstance();
+  if (!io) return [];
+  const stream = await getStreamMeta(streamId);
+  const sockets = await io.in(roomName(streamId)).fetchSockets();
+  const seen = new Map<string, ParticipantInfo>();
+  for (const s of sockets) {
+    const user = s.data.user as SessionUser | undefined;
+    if (!user?.id || seen.has(user.id)) continue;
+    seen.set(user.id, {
+      id: user.id,
+      name: user.name,
+      image: user.image,
+      isOwner: stream?.userId === user.id,
+    });
+  }
+  return [...seen.values()].sort((a, b) => {
+    if (a.isOwner !== b.isOwner) return a.isOwner ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+async function broadcastParticipants(
+  streamId: string,
+  exceptSocketId?: string,
+) {
+  const io = getIoInstance();
+  if (!io) return;
+  const body: ParticipantsUpdatedPayload = {
+    streamId,
+    participants: await listConnectedParticipants(streamId),
+  };
+  const target = exceptSocketId
+    ? io.to(roomName(streamId)).except(exceptSocketId)
+    : io.to(roomName(streamId));
+  target.emit(SocketEvents.ParticipantsUpdated, body);
 }
 
 /**
@@ -294,11 +324,11 @@ export async function broadcastQueue(streamId: string) {
  * Called by PATCH /api/stream after the DB update.
  */
 export async function broadcastStreamEnded(streamId: string) {
+  const history = await getAllSongs(streamId);
   try {
     await Promise.all([
       redis.del(metaKey(streamId)),
       redis.del(stateKey(streamId)),
-      redis.del(queueKey(streamId)),
     ]);
   } catch (error) {
     console.error(`[socket] cache cleanup failed for ${streamId}:`, error);
@@ -308,6 +338,10 @@ export async function broadcastStreamEnded(streamId: string) {
     console.error(`[socket] broadcastStreamEnded skipped: no io instance`);
     return;
   }
+  io.to(roomName(streamId)).emit(SocketEvents.QueueUpdated, {
+    streamId,
+    queue: history,
+  });
   const body: StreamEndedPayload = { streamId };
   io.to(roomName(streamId)).emit(SocketEvents.StreamEnded, body);
 }
@@ -333,7 +367,9 @@ export function createSocketServer(
         id: session.user.id,
         name: session.user.name,
         email: session.user.email,
+        image: session.user.image ?? null,
       } satisfies SessionUser;
+      socket.data.joinedStreams = new Set<string>();
       next();
     } catch {
       next(new Error("unauthorized"));
@@ -355,9 +391,12 @@ export function createSocketServer(
         const ack = ackOf(cb);
         try {
           await assertMembership(payload.streamId, user.id);
-          const data = await buildJoinData(payload.streamId, user.id);
           socket.join(roomName(payload.streamId));
+          (socket.data.joinedStreams as Set<string>).add(payload.streamId);
+          const data = await buildJoinData(payload.streamId, user.id);
+          data.participants = await listConnectedParticipants(payload.streamId);
           ack(ok(data));
+          void broadcastParticipants(payload.streamId, socket.id);
         } catch (error) {
           ack(fail((error as Error).message));
         }
@@ -368,9 +407,19 @@ export function createSocketServer(
       SocketEvents.StreamLeave,
       (payload: { streamId: string }, cb?: unknown) => {
         socket.leave(roomName(payload.streamId));
+        (socket.data.joinedStreams as Set<string> | undefined)?.delete(
+          payload.streamId,
+        );
         ackOf(cb)(ok());
+        void broadcastParticipants(payload.streamId);
       },
     );
+
+    socket.on("disconnect", () => {
+      const joined = socket.data.joinedStreams as Set<string> | undefined;
+      if (!joined?.size) return;
+      for (const id of joined) void broadcastParticipants(id);
+    });
 
     /* -- upvotes: write-through toggle -- */
 
@@ -429,14 +478,6 @@ export function createSocketServer(
           const wasCurrent = music.current;
           // Upvote rows cascade from the music delete (schema onDelete).
           await prisma.music.delete({ where: { id: musicId } });
-          try {
-            await redis.zrem(queueKey(streamId), musicId);
-          } catch (error) {
-            console.error(
-              `[socket] redis zrem failed for ${streamId}:`,
-              error,
-            );
-          }
           if (wasCurrent) {
             // The removed song was playing: stop everywhere. The owner can
             // press Play to start the top of the remaining queue.

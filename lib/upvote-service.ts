@@ -1,39 +1,57 @@
 import { prisma } from "./db";
-import { redis } from "./redis";
 import type { QueueEntry } from "./socket-events";
 
 export const STREAM_TTL = 60 * 60 * 24; // 24h
 
-export const queueKey = (streamId: string) => `stream:${streamId}:queue`;
 export const stateKey = (streamId: string) => `stream:${streamId}:state`;
 export const metaKey = (streamId: string) => `stream:${streamId}:meta`;
 
 /**
- * Ordered queue snapshot for a stream, cache-aside: reads the Redis sorted
- * set; on a miss (or empty set) hydrates from Postgres and warms the cache.
- * Falls back to a direct Postgres read when Redis is unavailable.
- *
- * The Redis set stores only `musicId → votes`; entries are enriched with
- * music metadata (title, thumbnail, adder, …) from Postgres on every read.
+ * Ordered queue snapshot for a stream, read straight from Postgres
+ * (the source of truth): all unplayed songs ordered by vote count,
+ * enriched with music metadata (title, thumbnail, adder, …).
  */
 export async function getQueue(streamId: string): Promise<QueueEntry[]> {
-  const key = queueKey(streamId);
-  let pairs: { musicId: string; votes: number }[] = [];
-  try {
-    const raw = await redis.zrange<(string | number)[]>(key, 0, -1, {
-      withScores: true,
-      rev: true,
-    });
-    if (raw.length > 0) {
-      pairs = parseZRangePairs(raw);
-    }
-  } catch (error) {
-    console.error(`[upvote] redis zrange failed for ${key}:`, error);
-  }
-  if (pairs.length === 0) {
-    pairs = await hydrateQueueFromDb(streamId);
-  }
+  const pairs = await hydrateQueueFromDb(streamId);
   return enrichQueueEntries(pairs);
+}
+
+export async function getAllSongs(streamId: string): Promise<QueueEntry[]> {
+  const musics = await prisma.music.findMany({
+    where: { streamId },
+    select: {
+      id: true,
+      title: true,
+      artist: true,
+      url: true,
+      thumbnailUrl: true,
+      durationSeconds: true,
+      source: true,
+      current: true,
+      played: true,
+      user: { select: { name: true } },
+      _count: { select: { upvotes: true } },
+    },
+  });
+  const entries: QueueEntry[] = musics.map((m) => ({
+    musicId: m.id,
+    votes: m._count.upvotes,
+    title: m.title,
+    artist: m.artist,
+    url: m.url,
+    thumbnailUrl: m.thumbnailUrl,
+    durationSeconds: m.durationSeconds,
+    source: m.source,
+    addedByName: m.user.name,
+    current: m.current,
+    played: m.played,
+  }));
+  entries.sort((a, b) => {
+    if (a.current !== b.current) return a.current ? -1 : 1;
+    if (a.played !== b.played) return a.played ? 1 : -1;
+    return b.votes - a.votes || a.title.localeCompare(b.title);
+  });
+  return entries;
 }
 
 /** Attach music metadata to ordered `(musicId, votes)` pairs, preserving order. */
@@ -52,6 +70,7 @@ async function enrichQueueEntries(
       durationSeconds: true,
       source: true,
       current: true,
+      played: true,
       user: { select: { name: true } },
     },
   });
@@ -71,20 +90,7 @@ async function enrichQueueEntries(
       source: music.source,
       addedByName: music.user.name,
       current: music.current,
-    });
-  }
-  return entries;
-}
-
-/** Sort descending by votes. Raw format alternates [member, score, ...]. */
-function parseZRangePairs(
-  raw: (string | number)[],
-): { musicId: string; votes: number }[] {
-  const entries: { musicId: string; votes: number }[] = [];
-  for (let i = 0; i < raw.length - 1; i += 2) {
-    entries.push({
-      musicId: String(raw[i]),
-      votes: Number(raw[i + 1] ?? 0),
+      played: music.played,
     });
   }
   return entries;
@@ -110,26 +116,12 @@ async function hydrateQueueFromDb(
     votes: counts.get(m.id) ?? 0,
   }));
   entries.sort((a, b) => b.votes - a.votes);
-  // Warm the cache (best-effort).
-  try {
-    if (entries.length > 0) {
-      const pairs = entries.map((e) => ({
-        score: e.votes,
-        member: e.musicId,
-      }));
-      await redis.zadd(queueKey(streamId), pairs[0], ...pairs.slice(1));
-      await redis.expire(queueKey(streamId), STREAM_TTL);
-    }
-  } catch (error) {
-    console.error(`[upvote] redis hydrate failed for ${streamId}:`, error);
-  }
   return entries;
 }
 
 /**
- * Write-through upvote toggle.
- * Postgres is the source of truth and is written first; the Redis sorted
- * set mirrors the delta atomically. Returns the fresh ordered queue plus
+ * Upvote toggle.
+ * Postgres is the source of truth. Returns the fresh ordered queue plus
  * the caller's resulting vote state.
  */
 export async function toggleUpvote(
@@ -157,7 +149,6 @@ export async function toggleUpvote(
     throw new Error("not a participant of this stream");
   if (!music) throw new Error("music is not in this stream");
 
-  // Postgres first (source of truth).
   const unique = { musicId_userId: { musicId, userId } };
   const existing = await prisma.upvote.findUnique({ where: unique });
   const delta = existing ? -1 : +1;
@@ -165,16 +156,6 @@ export async function toggleUpvote(
     await prisma.upvote.delete({ where: unique });
   } else {
     await prisma.upvote.create({ data: { musicId, userId } });
-  }
-
-  // Redis mirror (best-effort; failures are logged, reads degrade to DB).
-  try {
-    // Ensure every unplayed music is a member so the snapshot is complete.
-    await getQueue(streamId);
-    await redis.zincrby(queueKey(streamId), delta, musicId);
-    await redis.expire(queueKey(streamId), STREAM_TTL);
-  } catch (error) {
-    console.error(`[upvote] redis mirror failed for ${musicId}:`, error);
   }
 
   return { queue: await getQueue(streamId), upvoted: delta > 0 };

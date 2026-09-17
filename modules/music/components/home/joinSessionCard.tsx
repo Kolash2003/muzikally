@@ -78,7 +78,9 @@ export function JoinSessionCard() {
                 maxLength={16}
                 autoComplete="off"
                 spellCheck={false}
-                className="h-11 font-mono text-sm tracking-wider uppercase bg-muted/25 border-border/80 focus-visible:border-primary focus-visible:ring-primary/20"
+                autoCapitalize="off"
+                autoCorrect="off"
+                className="h-11 font-mono text-sm tracking-wider bg-muted/25 border-border/80 focus-visible:border-primary focus-visible:ring-primary/20"
               />
               <Button
                 type="submit"

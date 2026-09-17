@@ -14,6 +14,7 @@ export const SocketEvents = {
   /** server → room */
   QueueUpdated: "queue:updated",
   PlaybackState: "playback:state",
+  ParticipantsUpdated: "participants:updated",
   StreamEnded: "stream:ended",
   /** server → socket */
   Error: "error",
@@ -59,6 +60,7 @@ export interface QueueEntry {
   source: "Youtube" | "Spotify";
   addedByName: string;
   current: boolean;
+  played: boolean;
 }
 
 export interface QueueUpdatedPayload {
@@ -68,6 +70,11 @@ export interface QueueUpdatedPayload {
 
 export interface StreamEndedPayload {
   streamId: string;
+}
+
+export interface ParticipantsUpdatedPayload {
+  streamId: string;
+  participants: ParticipantInfo[];
 }
 
 export interface ParticipantInfo {

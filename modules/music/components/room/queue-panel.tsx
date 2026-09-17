@@ -213,7 +213,7 @@ export function QueuePanel({
 }: QueuePanelProps) {
   const current = queue.find((q) => q.current);
   const upcoming = queue
-    .filter((q) => !q.current)
+    .filter((q) => !q.current && !q.played)
     .sort((a, b) => b.votes - a.votes || a.title.localeCompare(b.title));
   // Only the host sees the remove (×) button, and never in read-only mode.
   const showRemove = isOwner && !readOnly && onRemove !== undefined;

@@ -13,7 +13,6 @@ import { SpotifyIcon } from "@/modules/music/components/brand-icons";
 import { SpotifyPlayer } from "./spotify-player";
 import {
   YouTubePlayer,
-  YT_STATE,
   type YouTubePlayerHandle,
 } from "./youtube-player";
 
@@ -50,11 +49,11 @@ export function PlayerPanel({
 }: PlayerPanelProps) {
   const [handle, setHandle] = useState<YouTubePlayerHandle | null>(null);
   const [playerError, setPlayerError] = useState(false);
-  // Playback key the "tap to enable sound" overlay was raised for. Keying by
-  // playback state means a new track/command dismisses it automatically.
-  const [tapKey, setTapKey] = useState<string | null>(null);
+  const [soundUnlocked, setSoundUnlocked] = useState(false);
   const appliedRef = useRef<string>("");
   const handleRef = useRef<YouTubePlayerHandle | null>(null);
+  const playOriginRef = useRef<number | null>(null);
+  const soundUnlockedRef = useRef(false);
 
   useEffect(() => {
     handleRef.current = handle;
@@ -77,23 +76,22 @@ export function PlayerPanel({
   );
 
   const playbackKey = `${playback?.musicId ?? ""}:${playback?.status ?? ""}`;
-  const needsTap = tapKey !== null && tapKey === playbackKey;
+  const needsTap =
+    playback?.status === "playing" && !soundUnlocked && Boolean(videoId) && !playerError;
 
   // Mirror the broadcast playback state into the local player.
+  // Autoplay-with-sound is blocked without a gesture, so locked clients
+  // start muted (allowed) and the overlay only unmutes — the video keeps
+  // running so a late tap does not restart the song.
   useEffect(() => {
     if (!handle || !playback) return;
     if (playbackKey === appliedRef.current) return;
     appliedRef.current = playbackKey;
     if (playback.status === "playing") {
+      playOriginRef.current = Date.now();
+      if (!soundUnlockedRef.current) handle.mute();
       handle.play();
-      // Autoplay with sound can be blocked without a user gesture.
-      const key = playbackKey;
-      const timer = setTimeout(() => {
-        if (handleRef.current?.getState() !== YT_STATE.PLAYING) {
-          setTapKey(key);
-        }
-      }, 2000);
-      return () => clearTimeout(timer);
+      return;
     }
     handle.pause();
   }, [handle, playback, playbackKey]);
@@ -253,8 +251,17 @@ export function PlayerPanel({
             <button
               type="button"
               onClick={() => {
-                handleRef.current?.play();
-                setTapKey(null);
+                const player = handleRef.current;
+                const playerTime = player?.getCurrentTime() ?? 0;
+                const wall = playOriginRef.current
+                  ? (Date.now() - playOriginRef.current) / 1000
+                  : 0;
+                const target = Math.max(playerTime, wall);
+                player?.unMute();
+                if (target > 0.5) player?.seek(target);
+                player?.play();
+                soundUnlockedRef.current = true;
+                setSoundUnlocked(true);
               }}
               className="group absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl bg-background/85 backdrop-blur-md transition-all hover:bg-background/75"
             >
@@ -293,7 +300,15 @@ export function PlayerPanel({
           <div className="flex items-center gap-2">
             <Button
               size="icon"
-              onClick={() => onControl(isPlaying ? "pause" : "play")}
+              onClick={() => {
+                if (!isPlaying) {
+                  soundUnlockedRef.current = true;
+                  setSoundUnlocked(true);
+                  handleRef.current?.unMute();
+                  handleRef.current?.play();
+                }
+                onControl(isPlaying ? "pause" : "play");
+              }}
               disabled={!controlsEnabled}
               aria-label={isPlaying ? "Pause" : "Play"}
               className="size-10 rounded-xl shadow-md shadow-primary/25 transition-all active:scale-95"

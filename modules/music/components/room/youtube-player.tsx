@@ -8,6 +8,10 @@ interface YTPlayer {
   cueVideoById(videoId: string): void;
   playVideo(): void;
   pauseVideo(): void;
+  mute(): void;
+  unMute(): void;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
+  getCurrentTime(): number;
   getPlayerState(): number;
   destroy(): void;
 }
@@ -71,6 +75,10 @@ export interface YouTubePlayerHandle {
   load(videoId: string): void;
   play(): void;
   pause(): void;
+  mute(): void;
+  unMute(): void;
+  seek(seconds: number): void;
+  getCurrentTime(): number;
   getState(): number | null;
 }
 
@@ -175,6 +183,19 @@ export function YouTubePlayer({
               pendingRef.current.autoplay = false;
             }
           },
+          mute: () => {
+            playerRef.current?.mute();
+          },
+          unMute: () => {
+            playerRef.current?.unMute();
+          },
+          seek: (seconds: number) => {
+            playerRef.current?.seekTo(seconds, true);
+          },
+          getCurrentTime: () =>
+            readyRef.current && playerRef.current
+              ? playerRef.current.getCurrentTime()
+              : 0,
           getState: () =>
             readyRef.current && playerRef.current
               ? playerRef.current.getPlayerState()
@@ -194,7 +215,7 @@ export function YouTubePlayer({
   }, []);
 
   useEffect(() => {
-    if (videoId) playerRef.current?.loadVideoById(videoId);
+    if (videoId) playerRef.current?.cueVideoById(videoId);
   }, [videoId]);
 
   return (

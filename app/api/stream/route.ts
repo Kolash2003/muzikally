@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { broadcastStreamEnded } from "@/lib/socket";
 import { headers } from "next/headers";
 
+const MAX_OWNED_STREAMS = 5;
+
 const CreateStreamSchema = z.object({
     type: z.enum(["Spotify", "Youtube"]).default("Youtube"),
 });
@@ -47,6 +49,21 @@ export async function POST(req: NextRequest) {
                 userId: session.user.id,
             },
         });
+
+        const overflow = await prisma.stream.findMany({
+            where: { userId: session.user.id },
+            orderBy: { createdAt: "desc" },
+            skip: MAX_OWNED_STREAMS,
+            select: { id: true },
+        });
+
+        if (overflow.length > 0) {
+            const overflowIds = overflow.map((s) => s.id);
+            await prisma.stream.deleteMany({
+                where: { id: { in: overflowIds } },
+            });
+            await Promise.all(overflowIds.map((id) => broadcastStreamEnded(id)));
+        }
 
         return NextResponse.json(
             { success: true, 

@@ -211,7 +211,9 @@ export function NotAMemberScreen({
           maxLength={16}
           autoComplete="off"
           spellCheck={false}
-          className="h-11 font-mono text-sm tracking-wider uppercase bg-muted/25"
+          autoCapitalize="off"
+          autoCorrect="off"
+          className="h-11 font-mono text-sm tracking-wider bg-muted/25"
         />
         <Button
           type="submit"
