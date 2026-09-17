@@ -81,8 +81,15 @@ async function getStreamMeta(streamId: string): Promise<StreamMeta | null> {
 }
 
 async function assertMembership(streamId: string, userId: string) {
-  const stream = await getStreamMeta(streamId);
+  // Always read the active flag from Postgres for joins. Redis metadata is
+  // intentionally cached for playback/control, but a stale `active: true`
+  // value must never allow a user to re-enter an ended stream.
+  const stream = await prisma.stream.findUnique({
+    where: { id: streamId },
+    select: { userId: true, active: true },
+  });
   if (!stream) throw new Error("stream not found");
+  if (!stream.active) throw new Error("stream has ended");
   if (stream.userId === userId) return;
   const participation = await prisma.participation.findUnique({
     where: { streamId_userId: { streamId, userId } },
@@ -91,10 +98,7 @@ async function assertMembership(streamId: string, userId: string) {
   if (!participation) throw new Error("not a participant of this stream");
 }
 
-/**
- * Full room hydration for the join ack. Ended streams are joinable
- * read-only (the client renders the ended screen from `stream.active`).
- */
+/** Full room hydration for the join ack. Ended streams are not joinable. */
 async function buildJoinData(
   streamId: string,
   userId: string,
@@ -393,9 +397,11 @@ export function createSocketServer(
         const ack = ackOf(cb);
         try {
           await assertMembership(payload.streamId, user.id);
+          const data = await buildJoinData(payload.streamId, user.id);
+          // Prevent a join that races with the host ending the stream.
+          if (!data.stream.active) throw new Error("stream has ended");
           socket.join(roomName(payload.streamId));
           (socket.data.joinedStreams as Set<string>).add(payload.streamId);
-          const data = await buildJoinData(payload.streamId, user.id);
           data.participants = await listConnectedParticipants(payload.streamId);
           ack(ok(data));
           void broadcastParticipants(payload.streamId, socket.id);

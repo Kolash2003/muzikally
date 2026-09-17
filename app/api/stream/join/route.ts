@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
                 success: false,
                 message: "This session has ended",
                 data: null
-            })
+            }, { status: 410 })
         }
     
         const joinEndUser = await prisma.participation.upsert({
