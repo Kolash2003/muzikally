@@ -109,9 +109,14 @@ export function YouTubePlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const readyRef = useRef(false);
-  const pendingRef = useRef<{ videoId: string | null; autoplay: boolean }>({
+  const pendingRef = useRef<{
+    videoId: string | null;
+    autoplay: boolean;
+    muted: boolean;
+  }>({
     videoId: null,
     autoplay: false,
+    muted: false,
   });
   const callbacksRef = useRef({ onReady, onEnded, onError, onHandle });
   // Mount-time video id for the async creation below; later changes go
@@ -138,7 +143,17 @@ export function YouTubePlayer({
               readyRef.current = true;
               // Flush intents that arrived before the player was ready.
               const pending = pendingRef.current;
-              pendingRef.current = { videoId: null, autoplay: false };
+              pendingRef.current = {
+                videoId: null,
+                autoplay: false,
+                muted: false,
+              };
+              if (
+                pending.muted &&
+                typeof playerRef.current?.mute === "function"
+              ) {
+                playerRef.current.mute();
+              }
               if (pending.videoId) {
                 if (pending.autoplay) {
                   playerRef.current?.loadVideoById(pending.videoId);
@@ -166,6 +181,7 @@ export function YouTubePlayer({
               pendingRef.current = {
                 videoId: id,
                 autoplay: pendingRef.current.autoplay,
+                muted: pendingRef.current.muted,
               };
             }
           },
@@ -184,10 +200,24 @@ export function YouTubePlayer({
             }
           },
           mute: () => {
-            playerRef.current?.mute();
+            if (
+              readyRef.current &&
+              typeof playerRef.current?.mute === "function"
+            ) {
+              playerRef.current.mute();
+            } else {
+              pendingRef.current.muted = true;
+            }
           },
           unMute: () => {
-            playerRef.current?.unMute();
+            if (
+              readyRef.current &&
+              typeof playerRef.current?.unMute === "function"
+            ) {
+              playerRef.current.unMute();
+            } else {
+              pendingRef.current.muted = false;
+            }
           },
           seek: (seconds: number) => {
             playerRef.current?.seekTo(seconds, true);
@@ -206,7 +236,7 @@ export function YouTubePlayer({
     return () => {
       cancelled = true;
       readyRef.current = false;
-      pendingRef.current = { videoId: null, autoplay: false };
+      pendingRef.current = { videoId: null, autoplay: false, muted: false };
       callbacksRef.current.onHandle?.(null);
       playerRef.current?.destroy();
       playerRef.current = null;
