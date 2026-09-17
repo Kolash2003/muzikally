@@ -23,6 +23,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3000"),
   title: "muzi — Real-time Social Jukebox & Collaborative Jam Sessions",
   description:
     "Stream music together in real-time, vote on the queue, and discover tracks with friends. No aux cord needed.",

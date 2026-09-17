@@ -10,10 +10,10 @@ import {
   Crown,
   Disc3,
   Loader2,
-  Music2,
   Power,
 } from "lucide-react";
 import { YoutubeIcon, SpotifyIcon } from "@/modules/music/components/brand-icons";
+import { DEMO_STREAM_CODE } from "@/lib/demo";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -33,6 +33,29 @@ export function StreamGrid({ items }: { items: StreamListItem[] }) {
   const router = useRouter();
   const [endingId, setEndingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [joiningDemo, setJoiningDemo] = useState(false);
+
+  async function joinDemoRoom() {
+    setJoiningDemo(true);
+    try {
+      const res = await fetch("/api/stream/join", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: DEMO_STREAM_CODE }),
+      });
+      const json = await res.json();
+      if (!json?.success || !json?.data?.streamId) {
+        throw new Error(json?.message || "Demo room unavailable");
+      }
+      router.push(`/stream/${json.data.streamId}`);
+      router.refresh();
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not join the demo room",
+      );
+      setJoiningDemo(false);
+    }
+  }
 
   async function endStream(id: string) {
     setEndingId(id);
@@ -69,7 +92,7 @@ export function StreamGrid({ items }: { items: StreamListItem[] }) {
       <Card className="glass-card overflow-hidden border-dashed border-border/80">
         <CardContent className="flex flex-col items-center justify-center gap-3 py-14 text-center">
           <div className="relative flex size-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
-            <Disc3 className="size-7 animate-[spin_8s_linear_infinite]" />
+            <Disc3 className="size-7 animate-[spin_8s_linear_infinite] motion-reduce:animate-none" />
           </div>
           <div className="flex flex-col gap-1">
             <h3 className="text-base font-semibold text-foreground">
@@ -77,6 +100,29 @@ export function StreamGrid({ items }: { items: StreamListItem[] }) {
             </h3>
             <p className="max-w-sm text-xs text-muted-foreground">
               Start your first session above to play YouTube or Spotify tracks, or join with a friend&apos;s code.
+            </p>
+          </div>
+          <div className="mt-2 flex flex-col items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={joinDemoRoom}
+              disabled={joiningDemo}
+              className="gap-1.5 border-primary/30 bg-primary/5 font-semibold text-primary hover:bg-primary/15 hover:text-primary active:scale-[0.98]"
+            >
+              {joiningDemo ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <span className="flex h-3 items-end gap-0.5" aria-hidden>
+                  <span className="eq-bar-1 w-0.5 rounded-full bg-primary" />
+                  <span className="eq-bar-2 w-0.5 rounded-full bg-primary" />
+                  <span className="eq-bar-3 w-0.5 rounded-full bg-primary" />
+                </span>
+              )}
+              <span>Peek into the demo room</span>
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Code <span className="font-mono font-semibold">{DEMO_STREAM_CODE}</span> · a live room with votes already rolling.
             </p>
           </div>
         </CardContent>

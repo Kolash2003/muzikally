@@ -44,8 +44,15 @@ export async function POST(req: NextRequest) {
             })
         }
     
-        const joinEndUser = await prisma.participation.create({
-            data: {
+        const joinEndUser = await prisma.participation.upsert({
+            where: {
+                streamId_userId: {
+                    streamId: isTheCodeValid.id,
+                    userId: session.user.id,
+                },
+            },
+            update: {},
+            create: {
                 userId: session.user.id,
                 streamId: isTheCodeValid.id
             }

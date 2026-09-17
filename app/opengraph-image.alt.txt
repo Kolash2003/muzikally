@@ -1,0 +1,1 @@
+muzi — Real-time social jukebox. Open a room, share a code, vote the queue.
