@@ -27,6 +27,7 @@ export function RoomClient({ streamId }: { streamId: string }) {
     removeFromQueue,
     sendPlayback,
     retry,
+    markEnded,
   } = useRoomSocket({ streamId });
 
   if (phase === "error") {
@@ -88,6 +89,7 @@ export function RoomClient({ streamId }: { streamId: string }) {
         isOwner={room.you.isOwner}
         ownerName={room.stream.ownerName}
         participants={room.participants}
+        onEnded={markEnded}
       />
       <main className="mx-auto grid w-full max-w-6xl flex-1 gap-4 px-4 py-4 sm:px-6 sm:py-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-4">

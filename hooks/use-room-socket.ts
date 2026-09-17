@@ -298,5 +298,6 @@ export function useRoomSocket({ streamId }: UseRoomSocketOptions) {
     removeFromQueue,
     sendPlayback,
     retry,
+    markEnded,
   };
 }

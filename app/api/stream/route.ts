@@ -133,42 +133,68 @@ export async function GET(req: NextRequest) {
 
 
 export async function PATCH(req: NextRequest) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
+    try {
+        const session = await auth.api.getSession({
+            headers: await headers(),
+        });
 
-    if(!session?.user) {
+        if(!session?.user) {
+            return NextResponse.json({
+                success: false,
+                message: "Unauthorized",
+                error: null
+            }, {
+                status: 401
+            })
+        }
+
+        const data = endStreamSchema.parse(await req.json());
+
+        const stream = await prisma.stream.findFirst({
+            where: {
+                id: data.streamId,
+                userId: session.user.id,
+            },
+            select: { id: true, active: true },
+        });
+
+        if (!stream) {
+            return NextResponse.json({
+                success: false,
+                message: "Stream not found or you are not the host",
+                error: null
+            }, {
+                status: 404
+            })
+        }
+
+        if (stream.active) {
+            await prisma.stream.update({
+                where: { id: stream.id },
+                data: { active: false },
+            });
+        }
+
+        // Notify the room and clear cached stream state.
+        await broadcastStreamEnded(data.streamId);
+
         return NextResponse.json({
-            success: false,
-            message: "Unauthorized",
+            success: true,
+            message: `Stream with id ${stream.id} ended succesfully`,
             error: null
         }, {
-            status: 401
+            status: 200
         })
+    } catch (error) {
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Error while ending the stream",
+                error: error instanceof Error ? error.message : String(error),
+            },
+            { status: 400 }
+        );
     }
-
-    const data = endStreamSchema.parse(await req.json());
-
-    const endStream = await prisma.stream.update({
-        where: {
-            id: data.streamId,
-            userId: session.user.id
-        },
-        data: {
-            active: false,
-        }
-    })
-
-    // Notify the room and clear cached stream state.
-    await broadcastStreamEnded(data.streamId);
-
-    return NextResponse.json({
-        success: true,
-        message: `Stream with id ${endStream.id} ended succesfully`,
-        error: null
-    }, {
-        status: 200
-    })
 }
 
 

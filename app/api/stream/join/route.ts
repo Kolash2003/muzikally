@@ -36,10 +36,18 @@ export async function POST(req: NextRequest) {
             }
         })
     
-        if(!isTheCodeValid){ 
+        if(!isTheCodeValid){
             return NextResponse.json({
                 success: false,
                 message: "The provided code does not match",
+                data: null
+            })
+        }
+
+        if(!isTheCodeValid.active){
+            return NextResponse.json({
+                success: false,
+                message: "This session has ended",
                 data: null
             })
         }

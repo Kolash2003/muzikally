@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { CreateSessionCard } from "./home/createSessionCard";
 import { JoinSessionCard } from "./home/joinSessionCard";
 import { StreamGrid, type StreamListItem } from "./home/streamGrid";
+import { StreamListRefresher } from "./home/stream-list-refresher";
 import { UserMenu } from "./home/userMenu";
 
 const HomePage = async () => {
@@ -113,6 +114,7 @@ const HomePage = async () => {
             </span>
           </div>
 
+          <StreamListRefresher streamIds={items.map((i) => i.id)} />
           <StreamGrid items={items} />
         </section>
       </main>

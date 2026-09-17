@@ -342,8 +342,10 @@ export async function broadcastStreamEnded(streamId: string) {
     streamId,
     queue: history,
   });
+  // Ended is broadcast globally (not just the room): clients outside the
+  // room — e.g. the dashboard list — must also flip to the ended state.
   const body: StreamEndedPayload = { streamId };
-  io.to(roomName(streamId)).emit(SocketEvents.StreamEnded, body);
+  io.emit(SocketEvents.StreamEnded, body);
 }
 
 /* ---------- server bootstrap ---------- */

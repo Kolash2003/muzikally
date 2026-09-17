@@ -42,6 +42,7 @@ interface RoomHeaderProps {
   isOwner: boolean;
   ownerName: string;
   participants: ParticipantInfo[];
+  onEnded?: () => void;
 }
 
 export function RoomHeader({
@@ -51,6 +52,7 @@ export function RoomHeader({
   isOwner,
   ownerName,
   participants,
+  onEnded,
 }: RoomHeaderProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -94,8 +96,10 @@ export function RoomHeader({
       const json = await res.json();
       if (!json?.success) throw new Error(json?.message || "Failed");
       // The stream:ended broadcast flips everyone (including the owner)
-      // to the ended screen; dismiss the confirmation dialog.
+      // to the ended screen. Flip immediately too, so a missed broadcast
+      // can't leave the owner staring at a "live" room.
       setEndDialogOpen(false);
+      onEnded?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not end session");
       setEnding(false);
