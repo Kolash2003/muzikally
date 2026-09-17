@@ -31,13 +31,14 @@ export const currentUser = async () => {
     return user;
 }
 
-export const requireAuth = async () => {
+export const requireAuth = async (returnTo = "/") => {
     const session = await auth.api.getSession({
         headers: await headers()
     });
 
     if(!session) {
-        return redirect("/sign-in");
+        const callbackUrl = encodeURIComponent(returnTo);
+        return redirect(`/sign-in?callbackUrl=${callbackUrl}`);
     }
 
     return session;

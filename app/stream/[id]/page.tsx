@@ -6,7 +6,7 @@ export default async function StreamRoomPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAuth();
   const { id } = await params;
+  await requireAuth(`/stream/${id}`);
   return <RoomClient streamId={id} />;
 }

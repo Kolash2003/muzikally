@@ -2,19 +2,26 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { ArrowBigUp, Loader2, Music2, Radio, Sparkles, Volume2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth-client";
 
 export default function SignInPage() {
   const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl");
+  const safeCallbackUrl =
+    callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//")
+      ? callbackUrl
+      : "/";
 
   const handleSignIn = async () => {
     setLoading(true);
     try {
       await signIn.social({
         provider: "google",
-        callbackURL: "/",
+        callbackURL: safeCallbackUrl,
       });
     } catch {
       setLoading(false);
